@@ -1,0 +1,14 @@
+{
+    "manifest_version": 3,
+    "version": "0.1.0",
+    "name": "FunctionNameGuesserExtension",
+    "description": "DevTools extension to get functionRanges from tsc in Chrome DevTools.",
+    "permissions": [
+      "experimental"
+    ],
+    "devtools_page": "DevToolsPlugin.html",
+    "content_security_policy": {
+      "extension_pages": "script-src 'self'; object-src 'self'"
+    },
+    "minimum_chrome_version": "104.0.0.0"
+}

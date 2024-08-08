@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    // "declaration": true,
+    "esModuleInterop": true,
+    // "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2020"],
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "target": "es5",
+    "rootDir": "src",
+    "outDir": "./build/",
+    "removeComments": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true,
+  }
+}
