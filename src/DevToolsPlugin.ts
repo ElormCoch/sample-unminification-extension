@@ -288,15 +288,5 @@ export async function getFunctionParser() {
 chrome.devtools.functionNameGuesser.registerFunctionNameGuesserExtensionPlugin(
     new FunctionNameGuesserPlugin(),
     /* name=*/ 'FunctionNameGuesser',
-    ['.js', '.jsx']
+    /* capabilities=*/['.js', '.jsx']
 );
-
-chrome.devtools.panels.create('unminification', "", "test.html",  function (panel) {
-    panel.onShown.addListener(() => { 
-        console.log('panel shown:  ', tsc.version)
-    });
-    panel.onHidden.addListener(() => {
-        console.log('panel hidden:  ', tsc.version)
-     });
-})
-
