@@ -146,7 +146,7 @@ function getNamesForFunctionLikeDeclaration(func: ts.FunctionLikeDeclaration): R
         className = classDefinition.name.text;
       }
       nameAsFunction =  `constructorCall:, ${className}`;
-      nameAsObject = `constructorCall:, ${className}`; 
+      nameAsObject = `classConstructorCall:, ${className}`; 
     }
   } else {
     /**

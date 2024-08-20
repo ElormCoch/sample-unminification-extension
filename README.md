@@ -12,5 +12,7 @@ Implements high fidelity unminification using typescript.
 
 * Load unpacked extension into a Chrome build with unminification extension API support
 
+NB: Since this is extension implements an experimental API, you may need to use the `--enable-experimental-extension-apis` flag when launching Chrome to laod the extension correctly.
+
 
 
