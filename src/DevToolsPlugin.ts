@@ -279,5 +279,5 @@ export async function getFunctionParser() {
 chrome.devtools.functionNameGuesser.registerFunctionNameGuesserExtensionPlugin(
     new FunctionNameGuesserPlugin(),
     /* name=*/ 'FunctionNameGuesser',
-    /* capabilities=*/['.js', '.jsx']
+    /* capabilities=*/['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs']
 );
