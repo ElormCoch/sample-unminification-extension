@@ -1,4 +1,3 @@
-import { SourceMapEntry, UnminificationMode } from "./DevToolsPlugin";
 import { FunctionDescriptor } from "./FunctionDescriptor";
 
 declare global {
@@ -8,7 +7,7 @@ declare global {
       /**
        * Returns function Descriptors for given source file.
        */
-      getFunctionRanges(fileName: string, sourceContent: string, sourceMap?: SourceMapEntry, unminificationMode?: UnminificationMode ): FunctionDescriptor[];
+      getFunctionRanges(fileName: string, sourceContent: string): FunctionDescriptor[];
     }
 
     /**

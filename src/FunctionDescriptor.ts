@@ -4,11 +4,12 @@
  */
 export class FunctionDescriptor {
   constructor(
-      readonly name: string,
+      readonly nameAsFunction: string,
       readonly startLine: number,
       readonly startColumn: number,
       readonly endLine: number,
       readonly endColumn: number,
+      readonly nameAsObject?: string,
   ) {
     if (startLine < 0 || startColumn < 0 || endLine < 0 || endColumn < 0) {
       throw new Error(

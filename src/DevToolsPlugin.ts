@@ -11,40 +11,25 @@ export interface ExtensionRequestParams {
   request: {
     fileName: string,
     sourceContent: string,
-    sourceMap: SourceMapEntry,
-    unminificationMode: UnminificationMode, // UnminificationMode
   }
-}
-export interface SourceMapEntry {
-lineNumber: number;
-columnNumber: number;
-sourceURL: string|undefined;
-sourceLineNumber: number;
-sourceColumnNumber: number;
-name: string|undefined;
 }
 
 export default class FunctionNameGuesserPlugin implements chrome.devtools.functionNameGuesser.FunctionNameGuesserExtensionPlugin {
-    getFunctionRanges(fileName: string, sourceContent: string, sourceMap?: SourceMapEntry, unminificationMode?: UnminificationMode ): FunctionDescriptor[] {  
-      return parse(sourceContent, fileName, unminificationMode ?? UnminificationMode.Default);
+    getFunctionRanges(fileName: string, sourceContent: string): FunctionDescriptor[] {  
+      return parse(fileName, sourceContent,);
     }
 }
 
-function parse(source: string, fileName: string, unminificationMode: UnminificationMode) {
+function parse(fileName: string, source: string,) {
     const markName = `parsing: ${fileName}`;
     const endMarkName = `${markName}-end`;
     performance.mark(markName);
     const kind = getFileType(fileName);
     const tsSource = tsc.createSourceFile(fileName, source, tsc.ScriptTarget.ESNext, /* setParentNodes: */ true, kind);
-    const result = visitRoot(tsSource, fileName, unminificationMode);
+    const result = visitRoot(tsSource, fileName);
     performance.mark(endMarkName);
     performance.measure(fileName, markName, endMarkName);
     return result;
-}
-
-export const enum UnminificationMode {
-    Default = 0,
-    HeapSnapshot = 1,
 }
 
 function getFileType(fileName: string) {
@@ -73,29 +58,29 @@ function getFileType(fileName: string) {
 }
 
 function visitRoot(
-    source: ts.SourceFile, fileName: string, unminificationMode: UnminificationMode): FunctionDescriptor[] {
+    source: ts.SourceFile, fileName: string): FunctionDescriptor[] {
   const accumulator: FunctionDescriptor[] = [];
 
   const name = `globalCode: ${fileName}`;
   accumulator.push(createDescriptor(name, source, source));
 
   for (const child of source.getChildren()) {
-    visitNodeIterative(accumulator, child, source, unminificationMode);
+    visitNodeIterative(accumulator, child, source);
   }
 
   return accumulator;
 }
 
 function visitNodeIterative(
-    dest: FunctionDescriptor[], node: ts.Node, source: ts.SourceFile, unminificationMode: UnminificationMode): void {
+    dest: FunctionDescriptor[], node: ts.Node, source: ts.SourceFile): void {
   if (tsc.isFunctionDeclaration(node) || tsc.isFunctionExpression(node) || tsc.isMethodDeclaration(node) ||
       tsc.isArrowFunction(node) || tsc.isConstructorDeclaration(node) || tsc.isGetAccessor(node) ||
       tsc.isGetAccessorDeclaration(node) || tsc.isSetAccessor(node) || tsc.isSetAccessorDeclaration(node)) {
-    visitFunctionNodeImpl(dest, node, source, unminificationMode);
+    visitFunctionNodeImpl(dest, node, source);
   }
 
   for (const child of node.getChildren()) {
-    visitNodeIterative(dest, child, source, unminificationMode);
+    visitNodeIterative(dest, child, source);
   }
 }
 
@@ -107,27 +92,32 @@ async function loadTypeScript() {
   return mod.default;
 }
 
+export interface ResolvedNames {
+  nameAsFunction: string,
+  nameAsObject?: string,
+}
 
 function visitFunctionNodeImpl(
-    dest: FunctionDescriptor[], node: ts.FunctionLikeDeclaration, source: ts.SourceFile,
-    unminificationMode: UnminificationMode): void {
+    dest: FunctionDescriptor[], node: ts.FunctionLikeDeclaration, source: ts.SourceFile,): void {
 if (node.body) {
-    const name = getFunctionName(node, unminificationMode);
-    const descriptor = createDescriptor(name, node, source);
+    const {nameAsFunction, nameAsObject} = getNamesForFunctionLikeDeclaration(node);
+    const descriptor = createDescriptor(nameAsFunction, node, source, nameAsObject);
     dest.push(descriptor);
   }
 }
 
-function createDescriptor(name: string, range: ts.TextRange, source: ts.SourceFile) {
+
+function createDescriptor(nameAsFunction: string, range: ts.TextRange, source: ts.SourceFile, nameAsObject?: string) {
   const {pos, end} = range;
   const {line: startLine, character: startColumn} = source.getLineAndCharacterOfPosition(pos);
   const {line: endLine, character: endColumn} = source.getLineAndCharacterOfPosition(end);
 
-  return new FunctionDescriptor(name, startLine, startColumn, endLine, endColumn);
+  return new FunctionDescriptor(nameAsFunction, startLine, startColumn, endLine, endColumn, nameAsObject);
 }
 
-function getFunctionName(func: ts.FunctionLikeDeclaration, unminificationMode: UnminificationMode): string {
-  let nameText = `anonymousFunction`;
+function getNamesForFunctionLikeDeclaration(func: ts.FunctionLikeDeclaration): ResolvedNames {
+  let nameAsFunction = 'anonymousFunction';
+  let nameAsObject;
   const nameNode = func.name;
   if (nameNode) {
     // named function, property name, identifier, string, computed property
@@ -141,7 +131,7 @@ function getFunctionName(func: ts.FunctionLikeDeclaration, unminificationMode: U
      *   [Symbol.toString]()    <--
      * }
      */
-    nameText = getNameOfNameNode(nameNode, func, nameText);
+    nameAsFunction = getNameOfNameNode(nameNode, func, nameAsFunction);
   } else if (tsc.isConstructorDeclaration(func)) {
     /**
      * class Sample {
@@ -155,9 +145,8 @@ function getFunctionName(func: ts.FunctionLikeDeclaration, unminificationMode: U
       if (classDefinition.name) {
         className = classDefinition.name.text;
       }
-      nameText = (unminificationMode === UnminificationMode.HeapSnapshot) ?
-          `classConstructorCall: ${className}` :
-          `constructorCall:, ${className}`;
+      nameAsFunction =  `constructorCall:, ${className}`;
+      nameAsObject = `constructorCall:, ${className}`; 
     }
   } else {
     /**
@@ -182,14 +171,14 @@ function getFunctionName(func: ts.FunctionLikeDeclaration, unminificationMode: U
       if (tsc.isVariableDeclaration(parent) || tsc.isPropertyAssignment(parent) ||
           tsc.isPropertyDeclaration(parent)) {
         if (parent.name && tsc.isIdentifier(parent.name)) {
-          nameText = getNameOfNameNode(parent.name, func, nameText);
+          nameAsFunction = getNameOfNameNode(parent.name, func, nameAsFunction);
         }
       } else if (tsc.isBinaryExpression(parent) && parent.operatorToken.kind === tsc.SyntaxKind.EqualsToken) {
         if (tsc.isPropertyAccessExpression(parent.left) || tsc.isElementAccessExpression(parent.left)) {
-          nameText = recursivelyGetPropertyAccessName(parent.left);
+          nameAsFunction = recursivelyGetPropertyAccessName(parent.left);
         } else if (
             tsc.isIdentifier(parent.left) || tsc.isStringLiteral(parent.left) || tsc.isNumericLiteral(parent.left)) {
-          nameText = parent.left.text;
+          nameAsFunction = parent.left.text;
         }
         // else unknown
       } else if (tsc.isCallOrNewExpression(func.parent) || tsc.isDecorator(func.parent)) {
@@ -198,12 +187,14 @@ function getFunctionName(func: ts.FunctionLikeDeclaration, unminificationMode: U
           // Localization is not required: this is a programming expression ("new Foo")
           parentExpressionName = `new ${parentExpressionName}`;
         }
-        nameText = `anonymousCallbackTo: ${parentExpressionName}`;
+        nameAsFunction = `anonymousCallbackTo: ${parentExpressionName}`;
       }
     }
   }
-
-  return nameText;
+  if (!nameAsObject) {
+    nameAsObject = nameAsFunction;
+  }
+  return {nameAsFunction, nameAsObject};
 }
 
 function recursivelyGetPropertyAccessName(expression: ts.Expression): string {
