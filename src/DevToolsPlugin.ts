@@ -1,25 +1,6 @@
 import tsc, {type default as ts} from 'typescript';
 import {FunctionDescriptor} from './FunctionDescriptor';
 
-export interface ExtensionRequest {
-  requestId: number,
-  method: string,
-  parameters: ExtensionRequestParams,
-}
-
-export interface ExtensionRequestParams {
-  request: {
-    fileName: string,
-    sourceContent: string,
-  }
-}
-
-export default class FunctionNameGuesserPlugin implements chrome.devtools.functionNameGuesser.FunctionNameGuesserExtensionPlugin {
-    getFunctionRanges(fileName: string, sourceContent: string): FunctionDescriptor[] {  
-      return parse(fileName, sourceContent,);
-    }
-}
-
 function parse(fileName: string, source: string,) {
     const markName = `parsing: ${fileName}`;
     const endMarkName = `${markName}-end`;
@@ -82,14 +63,6 @@ function visitNodeIterative(
   for (const child of node.getChildren()) {
     visitNodeIterative(dest, child, source);
   }
-}
-
-async function loadTypeScript() {
-  const mod = await import('typescript');
-  if (!mod.default) {
-    throw new ReferenceError('Enhanced DevTools were not available.');
-  }
-  return mod.default;
 }
 
 export interface ResolvedNames {
@@ -256,28 +229,22 @@ function getNameOfNameNode(nameNode: ts.PropertyName, declaringNode: ts.Node, fa
   return nameText;
 }
 
-let scriptLoadPromise: Promise<any> | undefined = undefined;
-export async function getFunctionParser() {
-  let tsc;
+function isSourceMapScriptFile(resouce: chrome.devtools.inspectedWindow.Resource) {
+  if (resouce && resouce.url && resouce.type === 'sm-script') {
+    const url = resouce.url.toLowerCase();
+    return url?.endsWith('.js') || url?.endsWith('.ts') || url?.endsWith('.jsx') || url?.endsWith('.tsx') || url?.endsWith('.mjs') || url?.endsWith('.cjs')
+  }
+  return false;
+ }
 
-  try {
-    if (!scriptLoadPromise) {
-      scriptLoadPromise = loadTypeScript();
+
+chrome.devtools?.inspectedWindow?.onResourceAdded.addListener(async (resource) => {
+  if (isSourceMapScriptFile(resource)) {
+    const scriptResource = await new Promise<{url: string, content?: string, encoding?: string}>(
+      r => resource.getContent((content, encoding) => r({url: resource.url, content, encoding})));
+    if (scriptResource.content) {
+      let ranges =  parse(resource.url, scriptResource.content);
+      chrome.devtools.languageServices.addFunctionNameRangesForScript(scriptResource.url, ranges);
     }
-    tsc = await scriptLoadPromise;
-  } catch (_ignored) {
-    return null;
   }
-
-  if (!tsc) {
-    return null;
-  }
-
-  return parse;
-}
-
-chrome.devtools.functionNameGuesser.registerFunctionNameGuesserExtensionPlugin(
-    new FunctionNameGuesserPlugin(),
-    /* name=*/ 'FunctionNameGuesser',
-    /* capabilities=*/['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs']
-);
+})
