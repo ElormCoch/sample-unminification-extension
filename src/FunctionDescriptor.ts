@@ -4,20 +4,11 @@
  */
 export class FunctionDescriptor {
   constructor(
-      readonly nameAsFunction: string,
+      readonly name: string,
       readonly startLine: number,
       readonly startColumn: number,
       readonly endLine: number,
       readonly endColumn: number,
-      readonly nameAsObject?: string,
-      /**
-       * TODO: consolidate nameAsObject and nameAFunction in to anme and have type param
-       * {
-        // ... ranges
-        name: 'Foo',
-        type: 'constructor' -> (memory: class Foo) | (perf: constructor for class Foo) | 'anonymousCallback To' -> name | 'function' -> name
-      }
-      **/
   ) {
     if (startLine < 0 || startColumn < 0 || endLine < 0 || endColumn < 0) {
       throw new Error(

@@ -65,32 +65,30 @@ function visitNodeIterative(
   }
 }
 
-export interface ResolvedNames {
-  nameAsFunction: string,
-  nameAsObject?: string,
+export interface ResolvedName {
+  name: string,
 }
 
 function visitFunctionNodeImpl(
     dest: FunctionDescriptor[], node: ts.FunctionLikeDeclaration, source: ts.SourceFile,): void {
 if (node.body) {
-    const {nameAsFunction, nameAsObject} = getNamesForFunctionLikeDeclaration(node);
-    const descriptor = createDescriptor(nameAsFunction, node, source, nameAsObject);
+    const {name} = getNamesForFunctionLikeDeclaration(node);
+    const descriptor = createDescriptor(name, node, source);
     dest.push(descriptor);
   }
 }
 
 
-function createDescriptor(nameAsFunction: string, range: ts.TextRange, source: ts.SourceFile, nameAsObject?: string) {
+function createDescriptor(name: string, range: ts.TextRange, source: ts.SourceFile) {
   const {pos, end} = range;
   const {line: startLine, character: startColumn} = source.getLineAndCharacterOfPosition(pos);
   const {line: endLine, character: endColumn} = source.getLineAndCharacterOfPosition(end);
 
-  return new FunctionDescriptor(nameAsFunction, startLine, startColumn, endLine, endColumn, nameAsObject);
+  return new FunctionDescriptor(name, startLine, startColumn, endLine, endColumn);
 }
 
-function getNamesForFunctionLikeDeclaration(func: ts.FunctionLikeDeclaration): ResolvedNames {
-  let nameAsFunction = 'anonymousFunction';
-  let nameAsObject;
+function getNamesForFunctionLikeDeclaration(func: ts.FunctionLikeDeclaration): ResolvedName {
+  let name = 'anonymousFunction';
   const nameNode = func.name;
   if (nameNode) {
     // named function, property name, identifier, string, computed property
@@ -104,7 +102,7 @@ function getNamesForFunctionLikeDeclaration(func: ts.FunctionLikeDeclaration): R
      *   [Symbol.toString]()    <--
      * }
      */
-    nameAsFunction = getNameOfNameNode(nameNode, func, nameAsFunction);
+    name = getNameOfNameNode(nameNode, func, name);
   } else if (tsc.isConstructorDeclaration(func)) {
     /**
      * class Sample {
@@ -118,8 +116,7 @@ function getNamesForFunctionLikeDeclaration(func: ts.FunctionLikeDeclaration): R
       if (classDefinition.name) {
         className = classDefinition.name.text;
       }
-      nameAsFunction =  `constructorCall:, ${className}`;
-      nameAsObject = `classConstructorCall:, ${className}`; 
+      name =  `constructorCall:, ${className}`;
     }
   } else {
     /**
@@ -144,14 +141,14 @@ function getNamesForFunctionLikeDeclaration(func: ts.FunctionLikeDeclaration): R
       if (tsc.isVariableDeclaration(parent) || tsc.isPropertyAssignment(parent) ||
           tsc.isPropertyDeclaration(parent)) {
         if (parent.name && tsc.isIdentifier(parent.name)) {
-          nameAsFunction = getNameOfNameNode(parent.name, func, nameAsFunction);
+          name = getNameOfNameNode(parent.name, func, name);
         }
       } else if (tsc.isBinaryExpression(parent) && parent.operatorToken.kind === tsc.SyntaxKind.EqualsToken) {
         if (tsc.isPropertyAccessExpression(parent.left) || tsc.isElementAccessExpression(parent.left)) {
-          nameAsFunction = recursivelyGetPropertyAccessName(parent.left);
+          name = recursivelyGetPropertyAccessName(parent.left);
         } else if (
             tsc.isIdentifier(parent.left) || tsc.isStringLiteral(parent.left) || tsc.isNumericLiteral(parent.left)) {
-          nameAsFunction = parent.left.text;
+          name = parent.left.text;
         }
         // else unknown
       } else if (tsc.isCallOrNewExpression(func.parent) || tsc.isDecorator(func.parent)) {
@@ -160,14 +157,11 @@ function getNamesForFunctionLikeDeclaration(func: ts.FunctionLikeDeclaration): R
           // Localization is not required: this is a programming expression ("new Foo")
           parentExpressionName = `new ${parentExpressionName}`;
         }
-        nameAsFunction = `anonymousCallbackTo: ${parentExpressionName}`;
+        name = `anonymousCallbackTo: ${parentExpressionName}`;
       }
     }
   }
-  if (!nameAsObject) {
-    nameAsObject = nameAsFunction;
-  }
-  return {nameAsFunction, nameAsObject};
+  return {name};
 }
 
 function recursivelyGetPropertyAccessName(expression: ts.Expression): string {
