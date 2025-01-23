@@ -14,9 +14,6 @@ module.exports = {
         extensions: [".ts", ".js"],
     },
     devtool: 'source-map',
-    // externals: {
-    //     typescript: 'typescript'
-    // },
     module : {
         rules: [
             {

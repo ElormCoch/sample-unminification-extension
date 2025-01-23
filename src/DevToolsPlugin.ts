@@ -1,5 +1,5 @@
 import tsc, {type default as ts} from 'typescript';
-import {FunctionDescriptor} from './FunctionDescriptor';
+import {NamedFunctionRange} from './NamedFunctionRange';
 
 function parse(fileName: string, source: string,) {
     const markName = `parsing: ${fileName}`;
@@ -39,8 +39,8 @@ function getFileType(fileName: string) {
 }
 
 function visitRoot(
-    source: ts.SourceFile, fileName: string): FunctionDescriptor[] {
-  const accumulator: FunctionDescriptor[] = [];
+    source: ts.SourceFile, fileName: string): NamedFunctionRange[] {
+  const accumulator: NamedFunctionRange[] = [];
 
   const name = `globalCode: ${fileName}`;
   accumulator.push(createDescriptor(name, source, source));
@@ -53,7 +53,7 @@ function visitRoot(
 }
 
 function visitNodeIterative(
-    dest: FunctionDescriptor[], node: ts.Node, source: ts.SourceFile): void {
+    dest: NamedFunctionRange[], node: ts.Node, source: ts.SourceFile): void {
   if (tsc.isFunctionDeclaration(node) || tsc.isFunctionExpression(node) || tsc.isMethodDeclaration(node) ||
       tsc.isArrowFunction(node) || tsc.isConstructorDeclaration(node) || tsc.isGetAccessor(node) ||
       tsc.isGetAccessorDeclaration(node) || tsc.isSetAccessor(node) || tsc.isSetAccessorDeclaration(node)) {
@@ -70,7 +70,7 @@ export interface ResolvedName {
 }
 
 function visitFunctionNodeImpl(
-    dest: FunctionDescriptor[], node: ts.FunctionLikeDeclaration, source: ts.SourceFile,): void {
+    dest: NamedFunctionRange[], node: ts.FunctionLikeDeclaration, source: ts.SourceFile,): void {
 if (node.body) {
     const {name} = getNamesForFunctionLikeDeclaration(node);
     const descriptor = createDescriptor(name, node, source);
@@ -84,7 +84,7 @@ function createDescriptor(name: string, range: ts.TextRange, source: ts.SourceFi
   const {line: startLine, character: startColumn} = source.getLineAndCharacterOfPosition(pos);
   const {line: endLine, character: endColumn} = source.getLineAndCharacterOfPosition(end);
 
-  return new FunctionDescriptor(name, startLine, startColumn, endLine, endColumn);
+  return new NamedFunctionRange(name, { line: startLine, column: startColumn }, { line: endLine, column: endColumn });
 }
 
 function getNamesForFunctionLikeDeclaration(func: ts.FunctionLikeDeclaration): ResolvedName {
@@ -223,7 +223,11 @@ function getNameOfNameNode(nameNode: ts.PropertyName, declaringNode: ts.Node, fa
   return nameText;
 }
 
-function isSourceMapScriptFile(resouce: chrome.devtools.inspectedWindow.Resource) {
+interface ResourceWithType extends chrome.devtools.inspectedWindow.Resource {
+  type: string;
+}
+
+function isSourceMapScriptFile(resouce: chrome.devtools.inspectedWindow.Resource & ResourceWithType) {
   if (resouce && resouce.url && resouce.type === 'sm-script') {
     const url = resouce.url.toLowerCase();
     return url?.endsWith('.js') || url?.endsWith('.ts') || url?.endsWith('.jsx') || url?.endsWith('.tsx') || url?.endsWith('.mjs') || url?.endsWith('.cjs')
@@ -233,12 +237,12 @@ function isSourceMapScriptFile(resouce: chrome.devtools.inspectedWindow.Resource
 
 
 chrome.devtools?.inspectedWindow?.onResourceAdded.addListener(async (resource) => {
-  if (isSourceMapScriptFile(resource)) {
+  if (isSourceMapScriptFile(resource as ResourceWithType)) {
     const scriptResource = await new Promise<{url: string, content?: string, encoding?: string}>(
       r => resource.getContent((content, encoding) => r({url: resource.url, content, encoding})));
     if (scriptResource.content) {
       let ranges =  parse(resource.url, scriptResource.content);
-      chrome.devtools.languageServices.addFunctionNameRangesForScript(scriptResource.url, ranges);
+      chrome.devtools.languageServices.setFunctionRangesForScript(scriptResource.url, ranges);
     }
   }
 })

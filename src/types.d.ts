@@ -1,9 +1,9 @@
-import { FunctionDescriptor } from "./FunctionDescriptor";
+import { NamedFunctionRange } from "./NamedFunctionRange";
 
 declare global {
   /** Use the chrome.devtools.languageServices API in DevTools. */
   namespace chrome.devtools.languageServices {
-    function addFunctionNameRangesForScript(scriptUrl: string, ranges : FunctionDescriptor[]): Promise<void>;
+    function setFunctionRangesForScript(scriptUrl: string, ranges : NamedFunctionRange[]): Promise<void>;
   }
 }
 
