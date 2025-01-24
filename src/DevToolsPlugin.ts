@@ -223,11 +223,12 @@ function getNameOfNameNode(nameNode: ts.PropertyName, declaringNode: ts.Node, fa
   return nameText;
 }
 
-interface ResourceWithType extends chrome.devtools.inspectedWindow.Resource {
+interface InspectedResource extends chrome.devtools.inspectedWindow.Resource {
   type: string;
+  setFunctionRangesForScript: (scriptUrl: string, ranges: NamedFunctionRange[]) => Promise<void>;
 }
 
-function isSourceMapScriptFile(resouce: chrome.devtools.inspectedWindow.Resource & ResourceWithType) {
+function isSourceMapScriptFile(resouce: chrome.devtools.inspectedWindow.Resource & InspectedResource) {
   if (resouce && resouce.url && resouce.type === 'sm-script') {
     const url = resouce.url.toLowerCase();
     return url?.endsWith('.js') || url?.endsWith('.ts') || url?.endsWith('.jsx') || url?.endsWith('.tsx') || url?.endsWith('.mjs') || url?.endsWith('.cjs')
@@ -237,12 +238,12 @@ function isSourceMapScriptFile(resouce: chrome.devtools.inspectedWindow.Resource
 
 
 chrome.devtools?.inspectedWindow?.onResourceAdded.addListener(async (resource) => {
-  if (isSourceMapScriptFile(resource as ResourceWithType)) {
+  if (isSourceMapScriptFile(resource as InspectedResource)) {
     const scriptResource = await new Promise<{url: string, content?: string, encoding?: string}>(
       r => resource.getContent((content, encoding) => r({url: resource.url, content, encoding})));
     if (scriptResource.content) {
       let ranges =  parse(resource.url, scriptResource.content);
-      chrome.devtools.languageServices.setFunctionRangesForScript(scriptResource.url, ranges);
+      await (resource as InspectedResource).setFunctionRangesForScript(scriptResource.url, ranges);
     }
   }
 })
