@@ -225,7 +225,7 @@ function getNameOfNameNode(nameNode: ts.PropertyName, declaringNode: ts.Node, fa
 
 interface InspectedResource extends chrome.devtools.inspectedWindow.Resource {
   type: string;
-  setFunctionRangesForScript: (scriptUrl: string, ranges: NamedFunctionRange[]) => Promise<void>;
+  setFunctionRangesForScript: (ranges: NamedFunctionRange[]) => Promise<void>;
 }
 
 function isSourceMapScriptFile(resouce: chrome.devtools.inspectedWindow.Resource & InspectedResource) {
@@ -243,7 +243,7 @@ chrome.devtools?.inspectedWindow?.onResourceAdded.addListener(async (resource) =
       r => resource.getContent((content, encoding) => r({url: resource.url, content, encoding})));
     if (scriptResource.content) {
       let ranges =  parse(resource.url, scriptResource.content);
-      await (resource as InspectedResource).setFunctionRangesForScript(scriptResource.url, ranges);
+      await (resource as InspectedResource).setFunctionRangesForScript(ranges);
     }
   }
 })
